@@ -1,6 +1,6 @@
 import re
 
-lex = lambda s: re.findall(r'-?[0-9]+\.?[0-9]*|[a-zA-Z_+-/*]+|\(|\)|\'|"[^"]*"', s)
+lex = lambda s: re.findall(r'-?[0-9]+\.?[0-9]*|[a-zA-Z_+-/*<>]+|\(|\)|\'|"[^"]*"', s)
 
 class Symbol(str):
     def __repr__(self):
@@ -44,7 +44,7 @@ def parse(s):
         raise ValueError('failed to fully parse expression')
     return expr
 
-ops = {'+', '-', '*', '/'}
+ops = {'+', '-', '*', '/', '<', '<=', '==', '!=', '>', '>='}
 
 binops = {'+': 'BINARY_ADD', '-': 'BINARY_SUBTRACT', '*': 'BINARY_MULTIPLY', '/': 'BINARY_TRUE_DIVIDE'}
 unops = {'+': 'UNARY_POSITIVE', '-': 'UNARY_NEGATIVE'}
@@ -83,7 +83,7 @@ class Compiler:
     def to_func_object(self):
         return types.FunctionType(
             self.to_code_object(), # code
-            {}, # globals
+            globals(), # globals
             self.name # name
         )
 
@@ -100,6 +100,12 @@ class Compiler:
             self.bs.append(dis.opmap[args[0]])
             self.bs.append(args[1])
 
+    def add_name(self, name):
+        if name in self.co_names:
+            return self.co_names.index(name)
+        self.co_names.append(name)
+        return len(self.co_names)-1
+
     def compile(self, expr):
         if type(expr) == list:
             if expr[0] == 'def':
@@ -109,6 +115,8 @@ class Compiler:
                     self.name = expr[1]
                     self.assignment = True
                 self.compile(expr[2])
+            elif expr[0] == 'if':
+                self.compile_if(expr[1], expr[2], expr[3])
             elif expr[0] in ops:
                 self.compile_op(expr[0], expr[1:])
             else:
@@ -118,22 +126,39 @@ class Compiler:
         else:
             self.compile_atom(expr)
 
+    def compile_if(self, cond, then, _else):
+        self.compile(cond)
+        self.emit('POP_JUMP_IF_FALSE', 0)
+        i = len(self.bs)-1
+        self.compile(then)
+        self.emit('JUMP_FORWARD', 0)
+        j = len(self.bs)-1
+        self.compile(_else)
+        self.bs[i] = j+1
+        self.bs[j] = len(self.bs)-j-1
+
     # TODO: handle multiple arguments
     def compile_op(self, op, args):
         if len(args) == 1:
             self.compile(args[0])
             self.emit(unops[op])
-        else:
+        elif op in binops:
             self.compile(args[0])
             self.compile(args[1])
             self.emit(binops[op])
             for arg in args[2:]:
                 self.compile(arg)
                 self.emit(binops[op])
+        elif op in {'<', '<=', '==', '!=', '>', '>='}:
+            self.compile(args[0])
+            self.compile(args[1])
+            self.emit('COMPARE_OP', dis.cmp_op.index(op))
+            for arg in args[2:]:
+                self.compile(arg)
+                self.emit('COMPARE_OP', dis.cmp_op.index(op))
 
     def compile_funcall(self, func, args):
-        self.co_names.append(func)
-        self.emit('LOAD_NAME', len(self.co_names)-1)
+        self.emit('LOAD_GLOBAL', self.add_name(func))
         for arg in args:
             self.compile(arg)
         self.emit('CALL_FUNCTION', len(args))
@@ -143,8 +168,7 @@ class Compiler:
             if atom in self.args:
                 self.emit('LOAD_FAST', self.args.index(atom))
             else:
-                self.co_names.append(atom)
-                self.emit('LOAD_NAME', len(self.co_names)-1)
+                self.emit('LOAD_GLOBAL', self.add_name(atom))
         else:
             self.co_consts.append(atom)
             self.emit('LOAD_CONST', len(self.co_consts)-1)
@@ -159,9 +183,9 @@ def lisp_eval(s):
     c.compile(parse(s))
     if c.name:
         if c.assignment:
-            globals()[c.name] = eval(c.to_code_object())
-            return globals()[c.name]
-        globals()[c.name] = c.to_func_object()
+            globals()[str(c.name)] = eval(c.to_code_object())
+            return globals()[str(c.name)]
+        globals()[str(c.name)] = c.to_func_object()
     else:
         return eval(c.to_code_object())
 
