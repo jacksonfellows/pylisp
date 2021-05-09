@@ -1,6 +1,6 @@
 import re
 
-lex = lambda s: re.findall(r'-?[0-9]+\.?[0-9]*|[a-zA-Z_+-/*<>]+|\(|\)|\'|"[^"]*"', s)
+lex = lambda s: re.findall(r'-?[0-9]+\.?[0-9]*|[a-zA-Z_+-/*<>=!]+|\(|\)|\'|"[^"]*"', s)
 
 class Symbol(str):
     def __repr__(self):
