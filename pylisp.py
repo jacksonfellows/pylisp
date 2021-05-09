@@ -165,7 +165,6 @@ class Compiler:
         self.bs[i] = j+1
         self.bs[j] = len(self.bs)-j-1
 
-    # TODO: handle multiple arguments
     def compile_op(self, op, args):
         if len(args) == 1:
             self.compile(args[0])
