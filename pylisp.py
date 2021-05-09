@@ -122,9 +122,11 @@ class Compiler:
             else:
                 self.compile_funcall(expr[0], expr[1:])
         elif type(expr) == Quoted:
-            self.compile_atom(expr.x)
+            self.compile_const(expr.x)
+        elif type(expr) == Symbol:
+            self.compile_var(expr)
         else:
-            self.compile_atom(expr)
+            self.compile_const(expr)
 
     def compile_if(self, cond, then, _else):
         self.compile(cond)
@@ -149,13 +151,10 @@ class Compiler:
             for arg in args[2:]:
                 self.compile(arg)
                 self.emit(binops[op])
-        elif op in {'<', '<=', '==', '!=', '>', '>='}:
+        elif op in dis.cmp_op and len(args) == 2: # TODO: more args
             self.compile(args[0])
             self.compile(args[1])
             self.emit('COMPARE_OP', dis.cmp_op.index(op))
-            for arg in args[2:]:
-                self.compile(arg)
-                self.emit('COMPARE_OP', dis.cmp_op.index(op))
 
     def compile_funcall(self, func, args):
         self.emit('LOAD_GLOBAL', self.add_name(func))
@@ -163,15 +162,15 @@ class Compiler:
             self.compile(arg)
         self.emit('CALL_FUNCTION', len(args))
 
-    def compile_atom(self, atom):
-        if type(atom) == Symbol:
-            if atom in self.args:
-                self.emit('LOAD_FAST', self.args.index(atom))
-            else:
-                self.emit('LOAD_GLOBAL', self.add_name(atom))
+    def compile_var(self, var):
+        if var in self.args:
+            self.emit('LOAD_FAST', self.args.index(var))
         else:
-            self.co_consts.append(atom)
-            self.emit('LOAD_CONST', len(self.co_consts)-1)
+            self.emit('LOAD_GLOBAL', self.add_name(var))
+
+    def compile_const(self, const):
+        self.co_consts.append(const)
+        self.emit('LOAD_CONST', len(self.co_consts)-1)
 
 def lisp_compile(s):
     c = Compiler()
