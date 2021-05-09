@@ -1,17 +1,26 @@
 import re
 
-lex = lambda s: re.findall(r'-?[0-9]+\.?[0-9]*|[a-zA-Z_+-/*<>=!]+|\(|\)|\'|"[^"]*"', s)
+lex = lambda s: re.findall(r',|-?[0-9]+\.?[0-9]*|[a-zA-Z_+-/*<>=!]+|\(|\)|\'|`|"[^"]*"', s)
 
 class Symbol(str):
     def __repr__(self):
         return f'<{self}>'
 
-class Quoted:
+class C:
     def __init__(self, x):
         self.x = x
 
+class Quoted(C):
     def __repr__(self):
         return "'" + repr(self.x)
+
+class QuasiQuoted(C):
+    def __repr__(self):
+        return "`" + repr(self.x)
+
+class UnQuoted(C):
+    def __repr__(self):
+        return "," + repr(self.x)
 
 def atom(tok):
     try:
@@ -35,6 +44,12 @@ def _parse(toks):
     elif toks[0] == "'":
         expr, toks = _parse(toks[1:])
         return Quoted(expr), toks
+    elif toks[0] == '`':
+        expr, toks = _parse(toks[1:])
+        return QuasiQuoted(expr), toks
+    elif toks[0] == ',':
+        expr, toks = _parse(toks[1:])
+        return UnQuoted(expr), toks
     else:
         return atom(toks[0]), toks[1:]
 
@@ -123,10 +138,21 @@ class Compiler:
                 self.compile_funcall(expr[0], expr[1:])
         elif type(expr) == Quoted:
             self.compile_const(expr.x)
+        elif type(expr) == QuasiQuoted:
+            self.compile_const(self.replace_unquotes(expr.x))
         elif type(expr) == Symbol:
             self.compile_var(expr)
         else:
             self.compile_const(expr)
+
+    def replace_unquotes(self, expr):
+        if type(expr) == UnQuoted:
+            c = Compiler()
+            c.compile(expr.x)
+            return eval(c.to_code_object())
+        if type(expr) == list:
+            return [self.replace_unquotes(x) for x in expr]
+        return expr
 
     def compile_if(self, cond, then, _else):
         self.compile(cond)
