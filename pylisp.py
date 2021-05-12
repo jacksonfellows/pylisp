@@ -66,6 +66,8 @@ unops = {'+': 'UNARY_POSITIVE', '-': 'UNARY_NEGATIVE'}
 
 import types, dis
 
+macros = {}
+
 class Compiler:
     def __init__(self):
         self.co_consts = []
@@ -73,7 +75,7 @@ class Compiler:
         self.bs = []
         self.name = ''
         self.args = []
-        self.assignment = False
+        self.kind = None
 
     def to_code_object(self):
         return types.CodeType(
@@ -126,33 +128,41 @@ class Compiler:
             if expr[0] == 'def':
                 if type(expr[1]) == list:
                     self.name, *self.args = expr[1]
+                    self.kind = 'function'
                 else:
                     self.name = expr[1]
-                    self.assignment = True
+                    self.kind = 'assignment'
                 self.compile(expr[2])
+            elif expr[0] == 'defmacro':
+                self.name, *self.args = expr[1]
+                self.compile(expr[2])
+                self.kind = 'macro'
             elif expr[0] == 'if':
                 self.compile_if(expr[1], expr[2], expr[3])
             elif expr[0] in ops:
                 self.compile_op(expr[0], expr[1:])
+            elif expr[0] in macros:
+                self.compile(macros[expr[0]](*expr[1:]))
             else:
                 self.compile_funcall(expr[0], expr[1:])
         elif type(expr) == Quoted:
             self.compile_const(expr.x)
         elif type(expr) == QuasiQuoted:
-            self.compile_const(self.replace_unquotes(expr.x))
+            self.compile_quasiquoted(expr.x)
         elif type(expr) == Symbol:
             self.compile_var(expr)
         else:
             self.compile_const(expr)
 
-    def replace_unquotes(self, expr):
+    def compile_quasiquoted(self, expr):
         if type(expr) == UnQuoted:
-            c = Compiler()
-            c.compile(expr.x)
-            return eval(c.to_code_object())
-        if type(expr) == list:
-            return [self.replace_unquotes(x) for x in expr]
-        return expr
+            self.compile(expr.x)
+        elif type(expr) == list:
+            for x in expr:
+                self.compile_quasiquoted(x)
+            self.emit('BUILD_LIST', len(expr))
+        else:
+            self.compile_const(expr)
 
     def compile_if(self, cond, then, _else):
         self.compile(cond)
@@ -205,11 +215,13 @@ def lisp_compile(s):
 def lisp_eval(s):
     c = Compiler()
     c.compile(parse(s))
-    if c.name:
-        if c.assignment:
-            globals()[str(c.name)] = eval(c.to_code_object())
-            return globals()[str(c.name)]
+    if c.kind == 'assignment':
+        globals()[str(c.name)] = eval(c.to_code_object())
+        return globals()[str(c.name)]
+    elif c.kind == 'function':
         globals()[str(c.name)] = c.to_func_object()
+    elif c.kind == 'macro':
+        macros[str(c.name)] = c.to_func_object()
     else:
         return eval(c.to_code_object())
 
