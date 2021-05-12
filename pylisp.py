@@ -64,6 +64,38 @@ ops = {'+', '-', '*', '/', '<', '<=', '==', '!=', '>', '>='}
 binops = {'+': 'BINARY_ADD', '-': 'BINARY_SUBTRACT', '*': 'BINARY_MULTIPLY', '/': 'BINARY_TRUE_DIVIDE'}
 unops = {'+': 'UNARY_POSITIVE', '-': 'UNARY_NEGATIVE'}
 
+import operator
+
+def lisp_add(*args):
+    return sum(args)
+
+globals()['+'] = lisp_add
+
+def lisp_sub(*args):
+    if len(args) == 1:
+        return -args[0]
+    x = args[0] - args[1]
+    for a in args[2:]:
+        x -= a
+    return x
+
+globals()['-'] = lisp_sub
+
+def lisp_mul(*args):
+    return reduce(operator.mul, args)
+
+globals()['*'] = lisp_mul
+
+def lisp_div(*args):
+    if len(args) == 1:
+        return args[0]
+    x = args[0] / args[1]
+    for a in args[2:]:
+        x /= a
+    return x
+
+globals()['/'] = lisp_div
+
 import types, dis
 
 macros = {}
@@ -178,7 +210,8 @@ class Compiler:
     def compile_op(self, op, args):
         if len(args) == 1:
             self.compile(args[0])
-            self.emit(unops[op])
+            if op in unops:
+                self.emit(unops[op])
         elif op in binops:
             self.compile(args[0])
             self.compile(args[1])
