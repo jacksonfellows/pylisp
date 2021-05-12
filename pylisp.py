@@ -171,6 +171,8 @@ class Compiler:
                 self.kind = 'macro'
             elif expr[0] == 'if':
                 self.compile_if(expr[1], expr[2], expr[3])
+            elif expr[0] == 'apply':
+                self.compile_apply(expr[1], expr[2])
             elif expr[0] in ops:
                 self.compile_op(expr[0], expr[1:])
             elif expr[0] in macros:
@@ -185,6 +187,11 @@ class Compiler:
             self.compile_var(expr)
         else:
             self.compile_const(expr)
+
+    def compile_apply(self, func, args):
+        self.compile(func)
+        self.compile(args)
+        self.emit('CALL_FUNCTION_EX')
 
     def compile_quasiquoted(self, expr):
         if type(expr) == UnQuoted:
