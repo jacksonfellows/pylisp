@@ -205,6 +205,8 @@ class Compiler:
                 self.compile_set(expr[1], expr[2])
             elif expr[0] == 'while':
                 self.compile_while(expr[1], expr[2:])
+            elif expr[0] == 'return':
+                self.compile_return(expr[1])
             elif type(expr[0]) != list and expr[0] in ops:
                 self.compile_op(expr[0], expr[1:])
             elif type(expr[0]) != list and expr[0] in macros:
@@ -219,6 +221,10 @@ class Compiler:
             self.compile_var(expr)
         else:
             self.compile_const(expr)
+
+    def compile_return(self, expr):
+        self.compile(expr)
+        self.emit('RETURN_VALUE')
 
     def compile_while(self, cond, body):
         i = len(self.bs)
