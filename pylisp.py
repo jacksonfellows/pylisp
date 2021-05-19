@@ -176,7 +176,8 @@ class Compiler:
                 else:
                     self.name = expr[1]
                     self.kind = 'assignment'
-                self.compile(expr[2])
+                for x in expr[2:]:
+                    self.compile(x)
             elif expr[0] == 'defmacro':
                 self.name, *self.args = expr[1]
                 self.compile(expr[2])
