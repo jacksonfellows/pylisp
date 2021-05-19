@@ -31,6 +31,8 @@ def atom(tok):
         except ValueError:
             if tok[0] == '"' and tok[-1] == '"':
                 return tok[1:-1]
+            if '.' in tok:
+                return ['.'] + tok.split('.')
             return Symbol(tok)
 
 def _parse(toks):
