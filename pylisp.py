@@ -1,6 +1,6 @@
 import re
 
-lex = lambda s: re.findall(r',|-?[0-9]+\.?[0-9]*|[a-zA-Z_+-/*<>=!%]+|\(|\)|\'|`|"[^"]*"', s)
+lex = lambda s: re.findall(r',|-?[0-9]+\.?[0-9]*|[a-zA-Z_+-/*<>=!%.]+|\(|\)|\'|`|"[^"]*"', s)
 
 class Symbol(str):
     def __repr__(self):
@@ -183,9 +183,11 @@ class Compiler:
                 self.compile_if(expr[1], expr[2], expr[3])
             elif expr[0] == 'apply':
                 self.compile_apply(expr[1], expr[2])
-            elif expr[0] in ops:
+            elif expr[0] == '.':
+                self.compile_dot(expr[1], expr[2:])
+            elif type(expr[0]) != list and expr[0] in ops:
                 self.compile_op(expr[0], expr[1:])
-            elif expr[0] in macros:
+            elif type(expr[0]) != list and expr[0] in macros:
                 self.compile(macros[expr[0]](*expr[1:]))
             else:
                 self.compile_funcall(expr[0], expr[1:])
@@ -197,6 +199,11 @@ class Compiler:
             self.compile_var(expr)
         else:
             self.compile_const(expr)
+
+    def compile_dot(self, var, props):
+        self.compile_var(var)
+        for prop in props:
+            self.emit('LOAD_ATTR', self.add_name(prop))
 
     def compile_apply(self, func, args):
         self.compile(func)
