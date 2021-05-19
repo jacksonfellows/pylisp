@@ -242,7 +242,7 @@ class Compiler:
             self.emit('COMPARE_OP', dis.cmp_op.index(op))
 
     def compile_funcall(self, func, args):
-        self.emit('LOAD_GLOBAL', self.add_name(func))
+        self.compile(func)
         for arg in args:
             self.compile(arg)
         self.emit('CALL_FUNCTION', len(args))
