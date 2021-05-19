@@ -119,6 +119,7 @@ class Compiler:
         self.bs = []
         self.name = ''
         self.args = []
+        self.arg_names = []
         self.kind = None
         self.generator = False
 
@@ -127,13 +128,13 @@ class Compiler:
             len(self.args), # argcount
             0, # posonlyargcount
             0, # kwonlyargcount
-            len(self.args), # nlocals
+            len(self.arg_names), # nlocals
             32, # stacksize
             inspect.CO_GENERATOR if self.generator else 0, # flags
             self.to_codestring(), # codestring
             tuple(self.co_consts), # constants
             tuple(self.co_names), # names
-            tuple(self.args), # varnames
+            tuple(self.arg_names), # varnames
             '', # filename
             self.name, # name
             0, # firstlineno
@@ -168,11 +169,18 @@ class Compiler:
         self.co_names.append(name)
         return len(self.co_names)-1
 
+    def add_arg_name(self, arg):
+        if arg in self.arg_names:
+            return self.arg_names.index(arg)
+        self.arg_names.append(arg)
+        return len(self.arg_names)-1
+
     def compile(self, expr):
         if type(expr) == list:
             if expr[0] == 'def':
                 if type(expr[1]) == list:
                     self.name, *self.args = expr[1]
+                    self.arg_names = self.args.copy()
                     self.kind = 'function'
                 else:
                     self.name = expr[1]
@@ -193,6 +201,10 @@ class Compiler:
                 self.compile_import(expr[1:])
             elif expr[0] == 'yield':
                 self.compile_yield(expr[1])
+            elif expr[0] == '=':
+                self.compile_set(expr[1], expr[2])
+            elif expr[0] == 'while':
+                self.compile_while(expr[1], expr[2:])
             elif type(expr[0]) != list and expr[0] in ops:
                 self.compile_op(expr[0], expr[1:])
             elif type(expr[0]) != list and expr[0] in macros:
@@ -207,6 +219,43 @@ class Compiler:
             self.compile_var(expr)
         else:
             self.compile_const(expr)
+
+    def compile_while(self, cond, body):
+        i = len(self.bs)
+        self.compile(cond)
+        self.emit('POP_JUMP_IF_FALSE', 0)
+        j = len(self.bs)-1
+        for expr in body:
+            self.compile(expr)
+        self.emit('JUMP_ABSOLUTE', i)
+        self.bs[j] = len(self.bs)
+        self.compile_const(None)
+
+    def compile_set(self, _vars, vals):
+        if type(_vars) != list:
+            var, val = _vars, vals
+            self.compile(val)
+            self.emit('DUP_TOP')
+            if var in self.args:
+                self.emit('STORE_FAST', self.args.index(var))
+            elif self.kind == 'function':
+                self.emit('STORE_FAST', self.add_arg_name(var))
+            else:
+                self.emit('STORE_GLOBAL', self.add_name(var))
+        else:
+            assert len(_vars) == len(vals)
+            for val in vals:
+                self.compile(val)
+            self.emit('BUILD_TUPLE', len(vals))
+            self.emit('DUP_TOP')
+            self.emit('UNPACK_SEQUENCE', len(vals))
+            for var in _vars:
+                if var in self.args:
+                    self.emit('STORE_FAST', self.args.index(var))
+                elif self.kind == 'function':
+                    self.emit('STORE_FAST', self.add_arg_name(var))
+                else:
+                    self.emit('STORE_GLOBAL', self.add_name(var))
 
     def compile_yield(self, val):
         self.generator = True
@@ -276,8 +325,8 @@ class Compiler:
         self.emit('CALL_FUNCTION', len(args))
 
     def compile_var(self, var):
-        if var in self.args:
-            self.emit('LOAD_FAST', self.args.index(var))
+        if var in self.arg_names:
+            self.emit('LOAD_FAST', self.arg_names.index(var))
         else:
             self.emit('LOAD_GLOBAL', self.add_name(var))
 
