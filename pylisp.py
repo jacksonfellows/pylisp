@@ -108,7 +108,7 @@ def lisp_mod(*args):
 
 globals()['%'] = lisp_mod
 
-import types, dis
+import types, dis, inspect
 
 macros = {}
 
@@ -120,6 +120,7 @@ class Compiler:
         self.name = ''
         self.args = []
         self.kind = None
+        self.generator = False
 
     def to_code_object(self):
         return types.CodeType(
@@ -128,7 +129,7 @@ class Compiler:
             0, # kwonlyargcount
             len(self.args), # nlocals
             32, # stacksize
-            0, # flags
+            inspect.CO_GENERATOR if self.generator else 0, # flags
             self.to_codestring(), # codestring
             tuple(self.co_consts), # constants
             tuple(self.co_names), # names
@@ -190,6 +191,8 @@ class Compiler:
                 self.compile_dot(expr[1], expr[2:])
             elif expr[0] == 'import':
                 self.compile_import(expr[1:])
+            elif expr[0] == 'yield':
+                self.compile_yield(expr[1])
             elif type(expr[0]) != list and expr[0] in ops:
                 self.compile_op(expr[0], expr[1:])
             elif type(expr[0]) != list and expr[0] in macros:
@@ -204,6 +207,11 @@ class Compiler:
             self.compile_var(expr)
         else:
             self.compile_const(expr)
+
+    def compile_yield(self, val):
+        self.generator = True
+        self.compile(val)
+        self.emit('YIELD_VALUE')
 
     def compile_import(self, modules):
         for module in modules:
