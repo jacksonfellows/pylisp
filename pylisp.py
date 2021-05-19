@@ -122,6 +122,7 @@ class Compiler:
         self.arg_names = []
         self.kind = None
         self.generator = False
+        self.expr = True
 
     def to_code_object(self):
         return types.CodeType(
@@ -185,8 +186,12 @@ class Compiler:
                 else:
                     self.name = expr[1]
                     self.kind = 'assignment'
-                for x in expr[2:]:
+                self.expr = False
+                for x in expr[2:-1]:
                     self.compile(x)
+                self.expr = True
+                if len(expr) > 2:
+                    self.compile(expr[-1])
             elif expr[0] == 'defmacro':
                 self.name, *self.args = expr[1]
                 self.compile(expr[2])
@@ -231,8 +236,10 @@ class Compiler:
         self.compile(cond)
         self.emit('POP_JUMP_IF_FALSE', 0)
         j = len(self.bs)-1
+        self.expr = False
         for expr in body:
             self.compile(expr)
+        self.expr = True
         self.emit('JUMP_ABSOLUTE', i)
         self.bs[j] = len(self.bs)
         self.compile_const(None)
@@ -241,7 +248,7 @@ class Compiler:
         if type(_vars) != list:
             var, val = _vars, vals
             self.compile(val)
-            self.emit('DUP_TOP')
+            if self.expr: self.emit('DUP_TOP')
             if var in self.args:
                 self.emit('STORE_FAST', self.args.index(var))
             elif self.kind == 'function':
@@ -253,7 +260,7 @@ class Compiler:
             for val in vals:
                 self.compile(val)
             self.emit('BUILD_TUPLE', len(vals))
-            self.emit('DUP_TOP')
+            if self.expr: self.emit('DUP_TOP')
             self.emit('UNPACK_SEQUENCE', len(vals))
             for var in _vars:
                 if var in self.args:
