@@ -1,6 +1,6 @@
 import re
 
-lex = lambda s: re.findall(r',|-?[0-9]+\.?[0-9]*|[a-zA-Z_+-/*<>=!]+|\(|\)|\'|`|"[^"]*"', s)
+lex = lambda s: re.findall(r',|-?[0-9]+\.?[0-9]*|[a-zA-Z_+-/*<>=!%]+|\(|\)|\'|`|"[^"]*"', s)
 
 class Symbol(str):
     def __repr__(self):
@@ -59,9 +59,9 @@ def parse(s):
         raise ValueError('failed to fully parse expression')
     return expr
 
-ops = {'+', '-', '*', '/', '<', '<=', '==', '!=', '>', '>='}
+ops = {'+', '-', '*', '/', '%', '<', '<=', '==', '!=', '>', '>='}
 
-binops = {'+': 'BINARY_ADD', '-': 'BINARY_SUBTRACT', '*': 'BINARY_MULTIPLY', '/': 'BINARY_TRUE_DIVIDE'}
+binops = {'+': 'BINARY_ADD', '-': 'BINARY_SUBTRACT', '*': 'BINARY_MULTIPLY', '/': 'BINARY_TRUE_DIVIDE', '%': 'BINARY_MODULO'}
 unops = {'+': 'UNARY_POSITIVE', '-': 'UNARY_NEGATIVE'}
 
 import operator
@@ -95,6 +95,16 @@ def lisp_div(*args):
     return x
 
 globals()['/'] = lisp_div
+
+def lisp_mod(*args):
+    if len(args) == 1:
+        return args[0]
+    x = args[0] % args[1]
+    for a in args[2:]:
+        x %= a
+    return x
+
+globals()['%'] = lisp_mod
 
 import types, dis
 
