@@ -187,6 +187,8 @@ class Compiler:
                 self.compile_apply(expr[1], expr[2])
             elif expr[0] == '.':
                 self.compile_dot(expr[1], expr[2:])
+            elif expr[0] == 'import':
+                self.compile_import(expr[1:])
             elif type(expr[0]) != list and expr[0] in ops:
                 self.compile_op(expr[0], expr[1:])
             elif type(expr[0]) != list and expr[0] in macros:
@@ -201,6 +203,14 @@ class Compiler:
             self.compile_var(expr)
         else:
             self.compile_const(expr)
+
+    def compile_import(self, modules):
+        for module in modules:
+            self.compile_const(0)
+            self.compile_const(None)
+            self.emit('IMPORT_NAME', self.add_name(module))
+            self.emit('STORE_GLOBAL', self.add_name(module))
+        self.compile_const(None)
 
     def compile_dot(self, var, props):
         self.compile_var(var)
